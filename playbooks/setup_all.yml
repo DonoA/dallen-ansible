@@ -1,0 +1,5 @@
+- name: setup_all
+  become: true
+  hosts: all
+  roles:
+    - dallenjs

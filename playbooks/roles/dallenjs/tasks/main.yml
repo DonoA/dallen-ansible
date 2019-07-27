@@ -1,0 +1,113 @@
+---
+# tasks file for dallenjs
+- name: Ensure group "app" exists
+  group:
+    name: app
+    state: present
+
+- name: Add user "app"  
+  user:
+    name: app
+    groups: app
+    shell: /bin/bash
+    home: /srv/app
+    comment: "App run user"
+    state: present
+    password: '!'
+
+- name: Ensure nginx is installed
+  apt:
+    name: nginx
+    update_cache: yes
+    state: latest
+
+- name: Setup nginx config
+  template:
+    src: templates/nginx/nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install MySQL
+  apt: 
+    name: ['python-mysqldb', 'mysql-server']
+    update_cache: yes
+    cache_valid_time: 3600 
+    state: present
+
+- name: Start the MySQL service
+  service:
+    name: mysql 
+    state: started
+    enabled: true
+
+- name: update mysql root password for all root accounts
+  mysql_user: 
+    name: root 
+    host: "{{ item }}" 
+    password: "{{ mysql_root_password }}"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    check_implicit_admin: yes
+    priv: "*.*:ALL,GRANT"
+  with_items:
+    - "{{ ansible_hostname }}"
+    - 127.0.0.1
+    - ::1
+    - localhost
+
+- name: Ensure curl and wget are installed
+  apt:
+    name: 
+      - curl
+      - wget
+    update_cache: yes
+    state: latest
+
+- name: install NVM
+  shell: >
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | /bin/bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+  become: yes
+  become_user: app
+
+- name: install NVM
+  shell: >
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | /bin/bash
+  args:
+    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+  become: yes
+  become_user: app
+
+- name: install node 10 lts
+  shell: >
+    source ~/.nvm/nvm.sh && nvm install 10 && nvm alias default 10
+  args:
+    executable: /bin/bash
+    creates: "{{ ansible_env.HOME }}/.nvm/alias"
+  become: yes
+  become_user: app
+
+- name: Ensure git is installed
+  apt:
+    name: git
+    update_cache: yes
+    state: latest
+
+- name: download dallen-js repo
+  git:
+    repo: https://github.com/DonoA/DallenJS.git
+    dest: ~/DallenJS
+  become: yes
+  become_user: app
+
+- name: build server
+  shell: >
+    source ~/.nvm/nvm.sh && ./build.sh
+  args:
+    chdir: ~/DallenJS
+    executable: /bin/bash
+  become: yes
+  become_user: app
