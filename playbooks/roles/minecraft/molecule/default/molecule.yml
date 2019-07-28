@@ -8,7 +8,6 @@ lint:
 platforms:
   - name: ubuntu
     image: ubuntu:18.04
-    privileged: True
 provisioner:
   name: ansible
   lint:

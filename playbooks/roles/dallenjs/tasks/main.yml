@@ -69,15 +69,7 @@
   shell: >
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | /bin/bash
   args:
-    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
-  become: yes
-  become_user: app
-
-- name: install NVM
-  shell: >
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | /bin/bash
-  args:
-    creates: "{{ ansible_env.HOME }}/.nvm/nvm.sh"
+    creates: "/srv/app/.nvm/nvm.sh"
   become: yes
   become_user: app
 
@@ -86,7 +78,7 @@
     source ~/.nvm/nvm.sh && nvm install 10 && nvm alias default 10
   args:
     executable: /bin/bash
-    creates: "{{ ansible_env.HOME }}/.nvm/alias"
+    creates: "/srv/app/.nvm/alias"
   become: yes
   become_user: app
 
@@ -100,6 +92,7 @@
   git:
     repo: https://github.com/DonoA/DallenJS.git
     dest: ~/DallenJS
+    force: yes
   become: yes
   become_user: app
 
@@ -111,3 +104,68 @@
     executable: /bin/bash
   become: yes
   become_user: app
+
+- name: create nginx config
+  template:
+    src: templates/nginx/dallenjs.conf.j2
+    dest: /etc/nginx/sites-available/dallenjs.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: link nginx config
+  file:
+    src: /etc/nginx/sites-available/dallenjs.conf
+    dest: /etc/nginx/sites-enabled/dallenjs.conf
+    owner: root
+    group: root
+    state: link
+
+- name: create server config
+  template:
+    src: templates/config.json.j2
+    dest: /srv/app/DallenJS/server/config.json
+    owner: app
+    group: app
+    mode: '0644'
+
+- name: create db setup script
+  template:
+    src: templates/setup_db.sql.j2
+    dest: /srv/app/DallenJS/server/setup_db.sql
+    owner: app
+    group: app
+    mode: '0644'
+
+- name: Run mysql setup file
+  mysql_db:
+    state: import
+    name: all
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    target: /srv/app/DallenJS/server/setup_db.sql
+
+- name: create database.json file
+  template:
+    src: templates/database.json.j2
+    dest: /srv/app/DallenJS/server/database.json
+    owner: app
+    group: app
+    mode: '0644'
+
+- name: run database migrations
+  shell: >
+    source ~/.nvm/nvm.sh && npm run migrate up
+  args:
+    chdir: /srv/app/DallenJS/server
+    executable: /bin/bash
+  become: yes
+  become_user: app
+
+- name: create dallenjs service
+  template:
+    src: templates/dallenjs.service.j2
+    dest: /lib/systemd/system/dallenjs.service
+    owner: app
+    group: app
+    mode: '0644'

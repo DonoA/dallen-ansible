@@ -1,0 +1,115 @@
+---
+# tasks file for minecraft
+- name: Ensure group "{{minecraft_user}}" exists
+  group:
+    name: "{{minecraft_user}}"
+    state: present
+
+- name: Add user "{{minecraft_user}}"  
+  user:
+    name: "{{minecraft_user}}"
+    groups: "{{minecraft_user}}"
+    shell: /bin/bash
+    comment: "App run user"
+    state: present
+
+- name: Check java is installed
+  apt:
+    name: openjdk-11-jre-headless
+    update_cache: yes
+
+- name: Ensure git is installed
+  apt:
+    name: git
+    update_cache: yes
+    state: latest
+
+- name: Create working dir
+  file:
+    path: "~{{minecraft_user}}/BuildSpigot"
+    state: directory
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    mode: '0755'
+
+- name: Download build tools
+  get_url:
+    url: https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar
+    dest: ~/BuildSpigot/BuildTools.jar
+    mode: '0440'
+  become: yes
+  become_user: "{{ minecraft_user }}"
+
+- name: Create jar cache
+  file:
+    path: "~{{minecraft_user}}/SpigotJars"
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    state: directory
+    mode: '0755'
+
+- name: Build Spigot
+  shell: >
+    java -jar BuildTools.jar --rev {{minecraft_version}}
+  args:
+    chdir: "~{{minecraft_user}}/BuildSpigot"
+    executable: /bin/bash
+    creates: "~{{minecraft_user}}/BuildSpigot/spigot-{{minecraft_version}}.jar"
+  become: yes
+  become_user: "{{minecraft_user}}"
+
+- name: Copy completed jar
+  shell: >
+    cp spigot-*.jar ~/SpigotJars
+  args:
+    chdir: "~{{minecraft_user}}/BuildSpigot"
+    executable: /bin/bash
+  become: yes
+  become_user: "{{minecraft_user}}"
+
+- name: Create server folder
+  file:
+    path: "~{{minecraft_user}}/minecraftServer/{{server_name}}"
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    state: directory
+    mode: '0755'
+
+- name: Setup server
+  shell: >
+    cp ~/SpigotJars/spigot-{{minecraft_version}}.jar ~/minecraftServer/{{server_name}}/spigot-{{minecraft_version}}.jar
+  args:
+    chdir: "~{{minecraft_user}}/BuildSpigot"
+    executable: /bin/bash
+  become: yes
+  become_user: "{{minecraft_user}}"
+
+- name: Sign eula
+  template:
+    src: templates/eula.txt.j2
+    dest: ~{{minecraft_user}}/minecraftServer/{{server_name}}/eula.txt
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    mode: '0644'
+
+- name: Create properties
+  template:
+    src: templates/server.properties.j2
+    dest: ~{{minecraft_user}}/minecraftServer/{{server_name}}/server.properties
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    mode: '0644'
+
+- name: Create run script
+  template:
+    src: templates/start.sh.j2
+    dest: ~{{minecraft_user}}/minecraftServer/{{server_name}}/start.sh
+    owner: "{{minecraft_user}}"
+    group: "{{minecraft_user}}"
+    mode: '0700'
+
+- name: Ensure screen is installed
+  apt:
+    name: screen
+    update_cache: yes
+    state: latest
