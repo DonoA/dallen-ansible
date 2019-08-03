@@ -1,2 +1,4 @@
 logs/*.log
 hosts
+playbooks/roles/dallenjs/templates/stats/*
+!playbooks/roles/dallenjs/templates/stats/statfile.sample.json

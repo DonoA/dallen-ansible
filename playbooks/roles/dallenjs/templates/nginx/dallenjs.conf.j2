@@ -1,7 +1,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name dallen.io www.dallen.io;
+    server_name new.dallen.io dallen.io www.dallen.io;
 
     return 301 https://$host$request_uri;
 }
@@ -9,15 +9,14 @@ server {
 server {
     listen 443 ssl;
 
-    server_name dallen.io www.dallen.io;
+    server_name new.dallen.io dallen.io www.dallen.io;
 
     ssl_certificate /etc/nginx/ssl/dallen.io_cert.pem;
     ssl_certificate_key /etc/nginx/ssl/dallen.io_key.pem;
 
-    root /srv/app/DallenJS/client/build;
-
     location / {
-        index index.html;
+        root   /srv/app/DallenJS/client/build;
+        try_files $uri $uri/ /index.html;
     }
 }
 
@@ -26,8 +25,8 @@ server {
 
     server_name api.dallen.io;
 
-    ssl_certificate /etc/nginx/ssl/api.dallen.io_cert.pem;
-    ssl_certificate_key /etc/nginx/ssl/api.dallen.io_key.pem;
+    ssl_certificate /etc/nginx/ssl/dallen.io_cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/dallen.io_key.pem;
 
     location / {
         proxy_set_header X-Real-IP $remote_addr;

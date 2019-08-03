@@ -18,7 +18,7 @@
 - name: Ensure nginx is installed
   apt:
     name: nginx
-    update_cache: yes
+    # update_cache: yes
     state: latest
 
 - name: Setup nginx config
@@ -32,7 +32,7 @@
 - name: Install MySQL
   apt: 
     name: ['python-mysqldb', 'mysql-server']
-    update_cache: yes
+    # update_cache: yes
     cache_valid_time: 3600 
     state: present
 
@@ -62,7 +62,7 @@
     name: 
       - curl
       - wget
-    update_cache: yes
+    # update_cache: yes
     state: latest
 
 - name: install NVM
@@ -85,8 +85,31 @@
 - name: Ensure git is installed
   apt:
     name: git
-    update_cache: yes
+    # update_cache: yes
     state: latest
+
+- name: Try to get current git commit
+  shell: >
+    git rev-parse --short HEAD
+  register: current_commit_hash
+  args:
+    chdir: ~/DallenJS
+    executable: /bin/bash
+  become: yes
+  become_user: app
+  ignore_errors: yes
+
+- name: Try to get remote git commit
+  shell: >
+    git fetch > /dev/null;
+    git rev-parse --short origin/master
+  register: remote_commit_hash
+  args:
+    chdir: ~/DallenJS
+    executable: /bin/bash
+  become: yes
+  become_user: app
+  ignore_errors: yes
 
 - name: download dallen-js repo
   git:
@@ -95,15 +118,24 @@
     force: yes
   become: yes
   become_user: app
+  when: >
+    remote_commit_hash.stdout is not defined 
+    or current_commit_hash.stdout is not defined 
+    or remote_commit_hash.stdout != current_commit_hash.stdout
 
 - name: build server
   shell: >
-    source ~/.nvm/nvm.sh && ./build.sh
+    source ~/.nvm/nvm.sh && ./build.sh && touch .built
   args:
     chdir: ~/DallenJS
     executable: /bin/bash
   become: yes
   become_user: app
+  when: >
+    remote_commit_hash.stdout is not defined 
+    or current_commit_hash.stdout is not defined 
+    or remote_commit_hash.stdout != current_commit_hash.stdout
+
 
 - name: create nginx config
   template:
@@ -126,7 +158,7 @@
     src: templates/config.json.j2
     dest: /srv/app/DallenJS/server/config.json
     owner: app
-    group: app
+    group: users
     mode: '0644'
 
 - name: create db setup script
@@ -134,7 +166,7 @@
     src: templates/setup_db.sql.j2
     dest: /srv/app/DallenJS/server/setup_db.sql
     owner: app
-    group: app
+    group: users
     mode: '0644'
 
 - name: Run mysql setup file
@@ -150,7 +182,7 @@
     src: templates/database.json.j2
     dest: /srv/app/DallenJS/server/database.json
     owner: app
-    group: app
+    group: users
     mode: '0644'
 
 - name: run database migrations
@@ -162,10 +194,23 @@
   become: yes
   become_user: app
 
+- name: Copy in stats files
+  copy:
+    src: templates/stats/
+    dest: /srv/app/DallenJS/server/stats
+    owner: app
+    group: users
+    mode: '0644'
+
 - name: create dallenjs service
   template:
     src: templates/dallenjs.service.j2
     dest: /lib/systemd/system/dallenjs.service
     owner: app
-    group: app
+    group: users
     mode: '0644'
+
+- name: restart dallenjs
+  systemd:
+    state: restarted
+    name: dallenjs
