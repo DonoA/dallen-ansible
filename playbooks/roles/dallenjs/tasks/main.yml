@@ -1,24 +1,24 @@
 ---
 # tasks file for dallenjs
-- name: Ensure group "app" exists
+- name: Ensure group "{{ service_group }}" exists
   group:
-    name: app
+    name: "{{ service_group }}"
     state: present
 
-- name: Add user "app"  
+- name: Add user "{{ service_user }}"  
   user:
-    name: app
-    groups: app
+    name: "{{ service_user }}"
+    groups: "{{ service_group }}"
     shell: /bin/bash
-    home: /srv/app
-    comment: "App run user"
+    home: "{{ service_index }}"
+    comment: "Service run user"
     state: present
     password: '!'
 
 - name: Ensure nginx is installed
   apt:
     name: nginx
-    # update_cache: yes
+    update_cache: "{{ update_apt_cache }}"
     state: latest
 
 - name: Setup nginx config
@@ -31,8 +31,10 @@
 
 - name: Install MySQL
   apt: 
-    name: ['python-mysqldb', 'mysql-server']
-    # update_cache: yes
+    name: 
+      - 'python-mysqldb'
+      - 'mysql-server'
+    update_cache: "{{ update_apt_cache }}"
     cache_valid_time: 3600 
     state: present
 
@@ -62,30 +64,30 @@
     name: 
       - curl
       - wget
-    # update_cache: yes
+    update_cache: "{{ update_apt_cache }}"
     state: latest
 
 - name: install NVM
   shell: >
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.34.0/install.sh | /bin/bash
   args:
-    creates: "/srv/app/.nvm/nvm.sh"
+    creates: "{{ service_index }}/.nvm/nvm.sh"
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
 
-- name: install node 10 lts
+- name: install node "{{ node_version }}" lts
   shell: >
-    source ~/.nvm/nvm.sh && nvm install 10 && nvm alias default 10
+    source {{ service_index }}/.nvm/nvm.sh && nvm install {{ node_version }} && nvm alias default {{ node_version }}
   args:
     executable: /bin/bash
-    creates: "/srv/app/.nvm/alias"
+    creates: "{{ service_index }}/.nvm/alias"
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
 
 - name: Ensure git is installed
   apt:
     name: git
-    # update_cache: yes
+    update_cache: "{{ update_apt_cache }}"
     state: latest
 
 - name: Try to get current git commit
@@ -93,10 +95,10 @@
     git rev-parse --short HEAD
   register: current_commit_hash
   args:
-    chdir: ~/DallenJS
+    chdir: "{{ service_index }}/DallenJS"
     executable: /bin/bash
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
   ignore_errors: yes
 
 - name: Try to get remote git commit
@@ -105,19 +107,19 @@
     git rev-parse --short origin/master
   register: remote_commit_hash
   args:
-    chdir: ~/DallenJS
+    chdir: "{{ service_index }}/DallenJS"
     executable: /bin/bash
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
   ignore_errors: yes
 
 - name: download dallen-js repo
   git:
     repo: https://github.com/DonoA/DallenJS.git
-    dest: ~/DallenJS
+    dest: "{{ service_index }}/DallenJS"
     force: yes
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
   when: >
     remote_commit_hash.stdout is not defined 
     or current_commit_hash.stdout is not defined 
@@ -125,12 +127,12 @@
 
 - name: build server
   shell: >
-    source ~/.nvm/nvm.sh && ./build.sh && touch .built
+    source {{ service_index }}/.nvm/nvm.sh && ./build.sh && touch .built
   args:
-    chdir: ~/DallenJS
+    chdir: "{{ service_index }}/DallenJS"
     executable: /bin/bash
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
   when: >
     remote_commit_hash.stdout is not defined 
     or current_commit_hash.stdout is not defined 
@@ -156,17 +158,17 @@
 - name: create server config
   template:
     src: templates/config.json.j2
-    dest: /srv/app/DallenJS/server/config.json
-    owner: app
-    group: users
+    dest: "{{ service_index }}/DallenJS/server/config.json"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     mode: '0644'
 
 - name: create db setup script
   template:
     src: templates/setup_db.sql.j2
-    dest: /srv/app/DallenJS/server/setup_db.sql
-    owner: app
-    group: users
+    dest: "{{ service_index }}/DallenJS/server/setup_db.sql"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     mode: '0644'
 
 - name: Run mysql setup file
@@ -175,39 +177,39 @@
     name: all
     login_user: root
     login_password: "{{ mysql_root_password }}"
-    target: /srv/app/DallenJS/server/setup_db.sql
+    target: "{{ service_index }}/DallenJS/server/setup_db.sql"
 
 - name: create database.json file
   template:
     src: templates/database.json.j2
-    dest: /srv/app/DallenJS/server/database.json
-    owner: app
-    group: users
+    dest: "{{ service_index }}/DallenJS/server/database.json"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     mode: '0644'
 
 - name: run database migrations
   shell: >
-    source ~/.nvm/nvm.sh && npm run migrate up
+    source {{ service_index }}/.nvm/nvm.sh && npm run migrate up
   args:
-    chdir: /srv/app/DallenJS/server
+    chdir: "{{ service_index }}/DallenJS/server"
     executable: /bin/bash
   become: yes
-  become_user: app
+  become_user: "{{ service_user }}"
 
 - name: Copy in stats files
   copy:
     src: templates/stats/
-    dest: /srv/app/DallenJS/server/stats
-    owner: app
-    group: users
+    dest: "{{ service_index }}/DallenJS/server/stats"
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     mode: '0644'
 
 - name: create dallenjs service
   template:
     src: templates/dallenjs.service.j2
     dest: /lib/systemd/system/dallenjs.service
-    owner: app
-    group: users
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     mode: '0644'
 
 - name: restart dallenjs

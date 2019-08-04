@@ -3,16 +3,16 @@ Description=DallenJS
 Requires=After=mysql.service
 
 [Service]
-ExecStart=/srv/app/.nvm/versions/node/v10.16.0/bin/node /srv/app/DallenJS/server/app.js
-WorkingDirectory=/srv/app/DallenJS/server
+ExecStart={{ service_index }}.nvm/versions/node/v{{ node_version }}/bin/node {{ service_index }}/DallenJS/server/app.js
+WorkingDirectory={{ service_index }}/DallenJS/server
 Restart=always
 RestartSec=10
 StandardOutput=syslog
 StandardError=syslog
 SyslogIdentifier=dallenjs
 Environment=NODE_ENV=production
-User=app
-Group=app
+User={{ service_user }}
+Group={{ service_group }}
 
 [Install]
 WantedBy=multi-user.target
