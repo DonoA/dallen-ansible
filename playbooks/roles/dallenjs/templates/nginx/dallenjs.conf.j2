@@ -1,7 +1,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name new.dallen.io dallen.io www.dallen.io;
+    server_name www.donovanallen.net donovanallen.net dallen.io www.dallen.io;
 
     return 301 https://$host$request_uri;
 }
@@ -9,7 +9,21 @@ server {
 server {
     listen 443 ssl;
 
-    server_name new.dallen.io dallen.io www.dallen.io;
+    server_name www.donovanallen.net donovanallen.net;
+
+    ssl_certificate /etc/nginx/ssl/donovanallen.net_cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/donovanallen.net_key.pem;
+
+    location / {
+        root   /srv/app/DallenJS/client/build;
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+server {
+    listen 443 ssl;
+
+    server_name dallen.io www.dallen.io;
 
     ssl_certificate /etc/nginx/ssl/dallen.io_cert.pem;
     ssl_certificate_key /etc/nginx/ssl/dallen.io_key.pem;

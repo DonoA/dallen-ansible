@@ -3,7 +3,7 @@ Description=DallenJS
 Requires=After=mysql.service
 
 [Service]
-ExecStart={{ service_index }}.nvm/versions/node/v{{ node_version }}/bin/node {{ service_index }}/DallenJS/server/app.js
+ExecStart={{ service_index }}/.nvm/versions/node/v{{ node_version }}/bin/node {{ service_index }}/DallenJS/server/app.js
 WorkingDirectory={{ service_index }}/DallenJS/server
 Restart=always
 RestartSec=10
